@@ -67,4 +67,16 @@
         (br_if $M (i32.lt_u (local.get $j) (i32.const 4))))
       (local.set $i (i32.add (local.get $i) (i32.const 1)))
       (br_if $L (i32.lt_u (local.get $i) (local.get $iters))))
+    (i32.const 0))
+  ;; control: each agent writes ONLY into its own region, the one its memory.grow returned
+  (func (export "ownOnly") (param $id i32) (param $iters i32) (result i32)
+    (local $i i32) (local $old i32) (local $v i32)
+    (loop $L
+      (local.set $old (memory.grow (i32.const 1)))
+      (if (i32.eq (local.get $old) (i32.const -1)) (then (return (i32.const 2))))
+      (i32.store (i32.mul (local.get $old) (i32.const 65536)) (i32.const 48879))
+      (local.set $v (i32.load (i32.mul (local.get $old) (i32.const 65536))))
+      (if (i32.ne (local.get $v) (i32.const 48879)) (then (return (i32.const 3))))
+      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+      (br_if $L (i32.lt_u (local.get $i) (local.get $iters))))
     (i32.const 0)))

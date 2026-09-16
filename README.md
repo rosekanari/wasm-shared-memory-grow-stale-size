@@ -45,17 +45,28 @@ back through `i32.atomic.load`:
 FN=othersOnly ITERS=4000 node --wasm-enforce-bounds-checks stress3.js   # traps
 FN=othersOnly ITERS=4000 node stress3.js                               # passes
 FN=ownOnly    ITERS=4000 node --wasm-enforce-bounds-checks stress3.js   # passes
+# the canary d8 used here:
+# https://storage.googleapis.com/chromium-v8/official/canary/v8-mac-arm64-rel-15.6.3.zip
+# ./d8 --wasm-enforce-bounds-checks stress3-d8.js -- othersOnly 2000
 ```
 
-| Configuration | `othersOnly` | `ownOnly` (writes only to its own region) |
-|---|---|---|
-| Alpine x64, default (trap handler) | 6 OK / 6 | OK |
-| Alpine x64, `--wasm-enforce-bounds-checks` | **6 fail / 6** | 3 OK / 3 |
-| OmniOS r151058 x64, default (explicit checks by construction) | **6 fail / 6** | 2 OK / 2 |
-| macOS arm64, `d8` V8 15.6.3, `--wasm-enforce-bounds-checks` | **3 fail / 3** | — |
+One module (`stress3.wasm`, `maximum: 65536`), `ITERS=4000`, four agents per run.
+`ownOnly` is the same loop with each agent writing only into the region its own
+`memory.grow` returned.
 
-`ownOnly` never fails: the agent that performs the grow does observe the new
-size. Only the other agents keep the stale bound.
+| Configuration | `othersOnly` | `ownOnly` |
+|---|---|---|
+| Alpine 3.18 musl x64, Node 24.21.0, default (trap handler) | 3 OK / 3 | 3 OK / 3 |
+| Alpine 3.18 musl x64, Node 24.21.0, `--wasm-enforce-bounds-checks` | **5 fail / 5** | **5 OK / 5** |
+| OmniOS r151058 x64, Node 24.21.0, default (explicit checks by construction) | **5 fail / 5** | **5 OK / 5** |
+| macOS arm64, Node 26.8.2, default | 3 OK / 3 | 3 OK / 3 |
+| macOS arm64, Node 26.8.2, `--wasm-enforce-bounds-checks` | **3 fail / 5** | **5 OK / 5** |
+| macOS arm64, `d8` V8 15.6.3, default (`ITERS=2000`) | 3 OK / 3 | 3 OK / 3 |
+| macOS arm64, `d8` V8 15.6.3, `--wasm-enforce-bounds-checks` (`ITERS=2000`) | **3 fail / 3** | **3 OK / 3** |
+
+`ownOnly` never fails, on any platform, with or without the flag: the agent that
+performs the grow does observe the new size. Only the other agents keep the
+stale bound.
 
 ## Where the stale value lives
 
@@ -120,16 +131,12 @@ and SIGTERM because its main thread sits inside a synchronous wasm call.
 The `-d8.js` hosts are the same experiments ported to `d8`: `readbuffer`,
 `new Worker(src, {type: 'string'})`, blocking `getMessage`.
 
-## Authors
-
-Measurements and reduction by **rosekanari**, with **Claude Code** (Anthropic)
-co-authoring the harnesses, the reduction from a real build failure down to the
-182-byte module, and this write-up. Both are named as co-authors on the commits.
-
 ## Caveats
 
-- The declared `maximum` matters: with `maximum: 4096` pages the arm64 build did
-  not reproduce the trap form; with `maximum: 65536` it does.
+- The declared `maximum` matters, and it is not an architecture difference: at
+  `maximum: 4096` pages the trap form did not reproduce on any machine tried,
+  arm64 included; at `maximum: 65536` it reproduces on all of them, arm64
+  included. The modules here use 65536, as the napi-rs loader does.
 - The trap form is a race: deterministic on illumos and on `d8` canary,
   probabilistic elsewhere until the iteration count is raised.
 - Licensed 0BSD so that any of this can be lifted verbatim into an engine's own
