@@ -2,7 +2,7 @@
 // blocking getMessage, print. Usage: d8 stress5-d8.js -- <iters>
 const ITERS = (typeof arguments !== "undefined" && arguments[0]) ? Number(arguments[0]) : 1000;
 const NW = 4;
-const bytes = readbuffer("stress5.wasm");
+const bytes = readbuffer("repro.wasm");
 const mem = new WebAssembly.Memory({ initial: 16, maximum: 65536, shared: true });
 const mod = new WebAssembly.Module(bytes);
 const src = `

@@ -1,6 +1,6 @@
 const { Worker, isMainThread, workerData } = require("node:worker_threads");
 const fs = require("node:fs"), path = require("node:path");
-const bytes = fs.readFileSync(path.join(__dirname, "stress4.wasm"));
+const bytes = fs.readFileSync(path.join(__dirname, "instrumented.wasm"));
 const ITERS = Number(process.env.ITERS || 300);
 const FN = process.env.FN || "othersOnly";
 const NW = 4;
@@ -32,6 +32,9 @@ if (isMainThread) {
 } else {
   const { mod, mem, id, iters, fn } = workerData;
   const inst = new WebAssembly.Instance(mod, { env: { memory: mem, jsnoop: () => {} } });
+  const fname = fn;
+  if (typeof inst.exports[fname] !== "function")
+    throw new Error("no such export: " + fname + " (have: " + Object.keys(inst.exports).join(",") + ")");
   const rc = inst.exports[fn](id, iters);
   require("node:worker_threads").parentPort.postMessage({ rc });
 }

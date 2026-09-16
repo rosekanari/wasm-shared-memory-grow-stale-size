@@ -11,7 +11,7 @@ const OUT  = 8;          // V3 stores memory.size here
 const ADDR = 16 * PAGE;  // first byte of the new page (beyond the initial 16)
 const VALUE = 0xcafe;
 
-const bytes = fs.readFileSync(path.join(__dirname, "grow.wasm"));
+const bytes = fs.readFileSync(path.join(__dirname, "control-single-grow.wasm"));
 
 if (isMainThread) {
   const variant = process.argv[2] || "v1";

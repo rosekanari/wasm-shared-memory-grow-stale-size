@@ -2,7 +2,7 @@
 const FN = (typeof arguments !== "undefined" && arguments[0]) ? arguments[0] : "othersOnly";
 const ITERS = (typeof arguments !== "undefined" && arguments[1]) ? Number(arguments[1]) : 500;
 const NW = 4;
-const bytes = readbuffer("stress3.wasm");
+const bytes = readbuffer("repro.wasm");
 const mem = new WebAssembly.Memory({ initial: 16, maximum: 65536, shared: true });
 const mod = new WebAssembly.Module(bytes);
 const src = `

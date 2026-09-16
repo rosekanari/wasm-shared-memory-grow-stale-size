@@ -2,7 +2,7 @@
 // published by the others: an allocator's pattern.
 const { Worker, isMainThread, workerData } = require("node:worker_threads");
 const fs = require("node:fs"), path = require("node:path");
-const bytes = fs.readFileSync(path.join(__dirname, "stress3.wasm"));
+const bytes = fs.readFileSync(path.join(__dirname, "repro.wasm"));
 const ITERS = Number(process.env.ITERS || 200);
 const NW = 4;
 
@@ -22,11 +22,14 @@ if (isMainThread) {
   for (let id = 0; id < NW; id++) {
     const w = new Worker(__filename, { workerData: { mod, mem, id, iters: ITERS } });
     w.on("message", (m) => { if (m.rc !== 0) bad++; allDone(); });
-    w.on("error", (e) => { traps++; console.log("    agent " + id + " TRAP : " + e.message); allDone(); });
+    w.on("error", (e) => { traps++; console.log("    agent " + id + " error: " + e.message); allDone(); });
   }
 } else {
   const { mod, mem, id, iters } = workerData;
   const inst = new WebAssembly.Instance(mod, { env: { memory: mem } });
-  const rc = inst.exports[process.env.FN || "othersOnly"](id, iters);
+  const fname = process.env.FN || "othersOnly";
+  if (typeof inst.exports[fname] !== "function")
+    throw new Error("no such export: " + fname + " (have: " + Object.keys(inst.exports).join(",") + ")");
+  const rc = inst.exports[fname](id, iters);
   require("node:worker_threads").parentPort.postMessage({ rc });
 }
