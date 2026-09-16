@@ -120,6 +120,12 @@ and SIGTERM because its main thread sits inside a synchronous wasm call.
 The `-d8.js` hosts are the same experiments ported to `d8`: `readbuffer`,
 `new Worker(src, {type: 'string'})`, blocking `getMessage`.
 
+## Authors
+
+Measurements and reduction by **rosekanari**, with **Claude Code** (Anthropic)
+co-authoring the harnesses, the reduction from a real build failure down to the
+182-byte module, and this write-up. Both are named as co-authors on the commits.
+
 ## Caveats
 
 - The declared `maximum` matters: with `maximum: 4096` pages the arm64 build did
