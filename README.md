@@ -23,6 +23,31 @@ consistent](https://github.com/WebAssembly/threads/blob/main/proposals/threads/O
 the barrier orders all grows before the size query; the returned value is
 therefore required to be the final size.
 
+## Tracked upstream
+
+Both findings are open V8 issues, filed in mid-2026 by V8 and emscripten
+engineers — this repository is the reduced reproduction, not the report:
+
+- [**533026477**](https://issues.chromium.org/issues/533026477) —
+  *`memory.size` should be an atomic operation maintaining sequential
+  consistency*: for memory 0, V8 reads a copy of the size field out of
+  `WasmTrustedInstanceData`, which is only refreshed from other threads at
+  interrupts.
+- [**529880019**](https://issues.chromium.org/issues/529880019) —
+  *Cross-worker memory growth not observable with
+  `--wasm-enforce-bounds-checks`*: the aggravated form below. Root cause
+  diagnosed there as Turboshaft's load elimination caching the memory base and
+  size across the loop stack check, which was annotated as non-writing.
+
+That second diagnosis explains three things measured here: why the optimising
+tier fails more than the baseline one, why a call into a JS import refreshes the
+bound where a thousand internal wasm calls do not, and why `memory.grow 0` — a
+writing operation — refreshes it.
+
+Both were **still reproducing in September 2026 on an official canary `d8`
+(V8 15.6.3)**, after a fix had landed for each; the measurements below are
+attached as comments on both issues.
+
 ## Measured
 
 | Platform | Engine | agents reporting a stale size | worst gap |
@@ -31,6 +56,7 @@ therefore required to be the final size.
 | Alpine 3.18 musl x64 | Node 24.21.0 — V8 13.6.233.17 | 2–3 of 4 | **1318 pages (84 MB)** |
 | Alpine 3.18 musl x64 | Node 26.8.2 — V8 14.6.202.34 | 3 of 4 | 1000 pages (64 MB) |
 | OmniOS r151058 x64 (illumos, 8 vCPU) | Node 24.21.0 — V8 13.6.233.17 | 3 of 4 | 1 page |
+| OmniOS r151058 x64 (illumos, **bare metal**, Xeon E-2224, 4 cores) | Node 24.21.0 — V8 13.6.233.17 | 3 of 4 | — |
 | macOS arm64 | **`d8` V8 15.6.3 canary** | **3 of 4** | 124 pages |
 
 The barrier spins on `i32.atomic.load` only — no futex wait, no crossing into
@@ -58,6 +84,7 @@ FN=ownOnly    ITERS=4000 node --disable-wasm-trap-handler traps.js  # passes
 | Alpine x64, Node 24.21.0, `--disable-wasm-trap-handler` | **5 fail / 5** | 3 OK / 3 |
 | Alpine x64, Node 26.8.2, `--disable-wasm-trap-handler` | **3 fail / 5** | 3 OK / 3 |
 | OmniOS r151058 x64, default (no trap handler on this platform) | **5 fail / 5** | **5 OK / 5** |
+| OmniOS r151058 x64 (**bare metal**, 4 cores), default | **5 fail / 5** | **5 OK / 5** |
 | macOS arm64, Node 26.8.2, `--disable-wasm-trap-handler` | **3 fail / 5** | **5 OK / 5** |
 | `d8` V8 15.6.3 arm64, `--wasm-enforce-bounds-checks` (`ITERS=2000`) | **3 fail / 3** | **3 OK / 3** |
 
